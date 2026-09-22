@@ -85,7 +85,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
-    implementation("org.slf4j:slf4j-nop:2.0.16")
+    implementation("org.slf4j:slf4j-nop:2.0.19")
     implementation("io.getstream:stream-webrtc-android:1.3.10")
     // Knox: compileOnly — không đóng gói vào APK; class có thể không tồn tại lúc runtime
     if (knoxJar.exists()) compileOnly(files(knoxJar))
