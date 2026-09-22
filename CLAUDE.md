@@ -24,8 +24,6 @@ adb logcat -s RC:V                                       # every log in the app 
 
 Bump `versionCode`/`versionName` together in [app/build.gradle.kts](app/build.gradle.kts) (`1.4.5` ↔ `10405`); `versionName` is reported in every MQTT state payload and in on-disk crash breadcrumbs, and a version change wipes stale breadcrumbs on next launch.
 
-`tools/*.py` are host-side test rigs, not part of the build: `ws_probe.py` (connect to a local WS and fail unless a keyframe arrives), `m5_drift.py` (pts vs. wall clock), `ws_shape.py` (macOS stand-in for `tc netem` — delay/loss/rate-limit a WS hop).
-
 ## Architecture
 
 ### Lifecycle

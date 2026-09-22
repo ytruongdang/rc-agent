@@ -1,6 +1,6 @@
 # RC Agent
 
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/ytruongdang/rc-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/ytruongdang/rc-agent/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![minSdk](https://img.shields.io/badge/minSdk-26-brightgreen.svg)](app/build.gradle.kts)
 
@@ -50,9 +50,10 @@ Headwind MDM handles **deployment and configuration**. A separate backend
 (`rc-api`, `rc-relay`, `rc-ingest`, `rc-web`) handles **sessions and the viewer**.
 This repository is the **device-side agent** — the part that runs on Android.
 
-The backend is not included here; the MQTT topics and the WebSocket frame format
-are documented below so you can build or adapt one. If you only want to try the
-agent, `tools/ws_probe.py` stands in for a relay.
+The backend is not included here. The MQTT topics and the WebSocket frame format
+are specified below in enough detail to write one — the agent is a WebSocket
+client and opens no listening port of its own, so the relay is the piece you
+supply.
 
 ## Headwind MDM integration
 
@@ -147,7 +148,7 @@ adb logcat -s RC:V     # every log in the app uses TAG "RC"
 ## Quick start
 
 ```bash
-git clone https://github.com/OWNER/REPO.git
+git clone https://github.com/ytruongdang/rc-agent.git
 cd REPO
 ./gradlew testDebugUnitTest     # JVM unit tests — no device, no emulator
 ./gradlew assembleDebug         # debug APK (cleartext allowed)
@@ -339,16 +340,6 @@ Bump `versionCode` and `versionName` together (`1.4.5` ↔ `10405`). Headwind us
 `versionCode` to decide whether to push an update; `versionName` is reported in
 every MQTT state payload and in on-disk crash breadcrumbs, and a version change
 wipes stale breadcrumbs on next launch.
-
-## Host-side test rigs
-
-`tools/*.py` are standalone, not part of the Gradle build:
-
-```bash
-python3 tools/ws_probe.py          # connect to a local WS, fail unless a keyframe arrives
-python3 tools/m5_drift.py          # sample pts against wall clock — is the encoder falling behind?
-python3 tools/ws_shape.py --help   # macOS stand-in for `tc netem`: delay / loss / rate-limit a WS hop
-```
 
 ## Contributing
 
