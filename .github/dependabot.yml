@@ -5,7 +5,20 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    # One PR for the routine bumps; majors still arrive on their own, because
+    # on this project a major is usually a toolchain migration, not an upgrade.
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # 1.19.0 requires AGP 9.1 and compileSdk 37; we are on AGP 8.9 / sdk 36.
+      # Revisit together with the AGP 9 migration, not before.
+      - dependency-name: "androidx.core:core-ktx"
+        versions: [">=1.19.0"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
