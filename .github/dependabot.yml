@@ -18,6 +18,10 @@ updates:
         versions: [">=1.19.0"]
       - dependency-name: "com.squareup.okhttp3:okhttp"
         versions: [">=5.0.0"]
+      # AGP 9 drops the standalone Kotlin plugin, so it is a build-file change
+      # rather than a bump and Dependabot cannot land it. Tracked in #13.
+      - dependency-name: "com.android.application"
+        versions: [">=9.0.0"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
