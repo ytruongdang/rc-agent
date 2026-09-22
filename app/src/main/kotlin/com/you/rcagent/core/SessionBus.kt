@@ -53,6 +53,10 @@ object SessionBus {
         if (ScreenshotPump.available()) {
             Log.w(Config.TAG, "projection timeout, jpeg fallback")
             FaultLog.step("mp:timeout jpeg")
+            // Tự phục hồi được, nhưng phải kêu: AutoConsent mù thì cả fleet tụt
+            // xuống JPEG mà không ai biết, chỉ thấy "dạo này xem máy nào cũng mờ".
+            SessionDiag.fail("PROJECTION_FALLBACK", "consent timeout, jpeg path")
+            MqttClient.publishEvent("PROJECTION_FALLBACK", "consent timeout, jpeg path")
             SessionCapture.start(req)
         } else {
             fail("PROJECTION_TIMEOUT")
