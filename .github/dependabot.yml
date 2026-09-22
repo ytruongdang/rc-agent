@@ -11,10 +11,13 @@ updates:
       gradle-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      # 1.19.0 requires AGP 9.1 and compileSdk 37; we are on AGP 8.9 / sdk 36.
-      # Revisit together with the AGP 9 migration, not before.
+      # These want compileSdk 37 / AGP 9.1, and we are on compileSdk 36 / AGP 8.9.
+      # They are not routine bumps but the same single migration, so they are held
+      # until that migration happens rather than reopened every month.
       - dependency-name: "androidx.core:core-ktx"
         versions: [">=1.19.0"]
+      - dependency-name: "com.squareup.okhttp3:okhttp"
+        versions: [">=5.0.0"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
