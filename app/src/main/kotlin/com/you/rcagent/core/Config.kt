@@ -166,6 +166,13 @@ object BackendPrefs {
         }
     }
 
+    /** Chỉ các khoá ảnh hưởng tới kết nối broker/relay: so trước và sau khi áp cấu hình MDM. */
+    fun connFingerprint(ctx: Context): String {
+        val all = ctx.getSharedPreferences(PREFS, 0).all
+        return listOf(KEY_HOST, KEY_MQTT, KEY_TLS, KEY_MQTT_PASS, KEY_DEVICE_ID, KEY_RELAY_PORT)
+            .joinToString("|") { all[it]?.toString().orEmpty() }
+    }
+
     fun clearDeviceId(ctx: Context) {
         ctx.getSharedPreferences(PREFS, 0).edit().remove(KEY_DEVICE_ID).apply()
     }

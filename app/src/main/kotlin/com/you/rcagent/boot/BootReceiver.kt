@@ -21,7 +21,7 @@ class BootReceiver : BroadcastReceiver() {
         SelfHeal.run(ctx.applicationContext)
         Log.i(Config.TAG, "caps ${Capabilities.probe(ctx)}")
         AgentState.set(AgentState.Phase.IDLE)
-        MqttClient.connectNow()
+        MqttClient.connectNow(intent?.action?.substringAfterLast('.') ?: "boot")
         if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) KioskReturn.afterUpdate(ctx)
     }
 }

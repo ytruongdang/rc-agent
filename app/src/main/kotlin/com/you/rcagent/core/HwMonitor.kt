@@ -96,7 +96,7 @@ object HwMonitor {
         val run = Runnable {
             val arr = JSONArray()
             tail(n.coerceIn(1, MAX_DUMP)).forEach { l -> runCatching { arr.put(JSONObject(l)) } }
-            MqttClient.publishHw(nonce, arr)
+            MqttClient.publishHw(nonce, arr, ConnLog.tail(50))
         }
         handler?.post(run) ?: run.run()
     }

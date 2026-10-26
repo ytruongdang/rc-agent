@@ -97,6 +97,6 @@ object HeadwindBridge : ServiceConnection {
         }
         // Chỉ log key kiosk (không phải bí mật): phân biệt "Headwind không trả gì" với "app không hỏi".
         Log.i(Config.TAG, "hmdm pull pkg=$pkg kiosk=${raw[ManagedConfig.KIOSK_PKG] ?: raw["kiosk_package"] ?: raw["kiosk"]}")
-        if (ManagedConfig.apply(ctx, raw)) MqttClient.connectNow()
+        if (ManagedConfig.apply(ctx, raw)) MqttClient.connectNow("mdm-config", force = true)
     }
 }

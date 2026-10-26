@@ -161,3 +161,43 @@ Làm mờ khi không có tương tác (mặc định tắt), cũng đặt trong 
 | `dim_level` | 5–80 (mặc định 30) | Độ sáng còn lại (%) |
 
 Cách làm: một lớp đen bán trong suốt phủ lên (tối đa 80% đen: Android 12+ chặn chạm xuyên qua overlay đục hơn 80%), không đổi độ sáng hệ thống nên không cần `WRITE_SETTINGS`. Tác dụng giảm công suất rõ trên màn OLED; trên LCD đèn nền không giảm. Chạm lần đầu gỡ mờ ngay, và không mờ khi đang có phiên remote. Mẫu monitor có cờ `dimmed` để đối chiếu với nhiệt độ/lỗi.
+
+## Chẩn đoán kết nối MQTT (agent 1.4.8+)
+
+Mục tiêu: biết **vì sao** máy rớt rồi nối lại liên tục.
+
+### Phía broker (không cần agent mới)
+
+EMQX phát `$SYS/brokers/<node>/clients/<clientid>/(connected|disconnected)` với `reason`: `discarded` (clientId bị kết nối khác thay thế, tức trùng `device_id`), `takenover`, `keepalive_timeout`, `tcp_closed`/`sock_closed`, `kicked`, `idle_timeout`, `ssl_error`, `normal`. Payload có thêm `connected_at`, `disconnected_at`, `ipaddress`, `keepalive`, `clean_start`.
+
+Bắt buộc: user `ingest` phải được subscribe `$SYS/#`. `#` **không** bao gồm topic bắt đầu bằng `$`, nên thêm vào `docker/emqx/acl.conf`:
+
+```
+{allow, {username, "ingest"}, subscribe, ["$SYS/#"]}.
+```
+
+rồi khởi động lại EMQX. Nếu không, lệnh subscribe bị từ chối âm thầm (`Unspecified error`) và không có dữ liệu nào.
+
+Sau nginx (`stream`), `ipaddress` sẽ là địa chỉ của nginx chứ không phải của thiết bị, trừ khi bật PROXY protocol ở cả nginx và EMQX.
+
+### Phía agent
+
+Agent giữ `rc_conn.log` (~60 KB, sống qua kill). Mỗi dòng: `ts`, `ev` (`connect`, `connect_ok`, `connect_fail`, `disconnected`, `replaced`, `force`, `coalesced`), `reason`, và một số trường (`attempt`, `upMs`, `delayMs`, `net`, `rssi`, `phase`, `by` = ai ép nối lại). Được gửi:
+
+- Trong phản hồi `hw.dump` (trường `conn`, tối đa 50 dòng): backend tự gọi `hw.dump` khi có `MQTT_FLAP`.
+- Event `MQTT_FLAP` trên `rc/event/<id>` khi ≥ 4 lần rớt trong 10 phút (tối đa 1 lần / 30 phút), `msg` là tóm tắt lý do.
+
+### Backend
+
+Bảng `device_conn_events` (`docker/postgres/05-conn-events.sql`; chạy tay trên DB đã có). Chỉ ghi cho máy có trong `devices`. Giới hạn 600 sự kiện/giờ/máy; giữ 30 ngày (`CONN_EVENT_RETENTION_DAYS`).
+
+API: `GET /devices/:id/conn?hours=24` (số lần rớt theo lý do, thời gian giữ kết nối, dòng thời gian) và `GET /fleet/connections?hours=24` (lý do phổ biến toàn fleet và 20 máy rớt nhiều nhất). Giao diện: thẻ "Connection" ở trang HW và "Connection drops" ở trang Fleet.
+
+### Đọc kết quả
+
+| `reason` chiếm đa số | Hướng điều tra |
+|---|---|
+| `discarded` / `takenover` | Hai máy trùng `device_id`, hoặc agent tự nối lại chồng lên chính nó |
+| `keepalive_timeout` | Mạng chập chờn, NAT/proxy cắt kết nối rảnh, hoặc hệ điều hành làm agent không gửi ping kịp |
+| `tcp_closed` / `sock_closed` | Đứt mạng, đổi Wi-Fi/4G, proxy cắt, hoặc agent bị kill (xem `upMs` và `net`) |
+| `normal` | Agent chủ động ngắt: xem `by` trong nhật ký agent để biết nguồn ép nối lại |
