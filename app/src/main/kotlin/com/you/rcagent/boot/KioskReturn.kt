@@ -1,6 +1,7 @@
 package com.you.rcagent.boot
 
 import android.accessibilityservice.AccessibilityService
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
@@ -22,6 +23,7 @@ object KioskReturn {
 
     private val IGNORED = setOf(
         "android",
+        "com.android.settings",
         "com.android.systemui",
         "com.android.packageinstaller",
         "com.google.android.packageinstaller",
@@ -35,8 +37,16 @@ object KioskReturn {
     fun pickTarget(configured: String?, seen: String?, ours: String = Config.PKG): String? =
         listOf(configured, seen).firstOrNull { it != null && isCandidate(it, ours) }
 
-    /** Chỉ kéo về khi app mình đang che (hoặc chưa biết gì sau khi process mới sinh). */
-    fun needsReturn(fg: String?, ours: String = Config.PKG): Boolean = fg == null || fg == ours
+    /** Process của mình ở IMPORTANCE_FOREGROUND chỉ khi một activity của mình đang trên cùng. */
+    private fun coversScreen(ctx: Context): Boolean {
+        // Sự kiện a11y rõ ràng hơn; chỉ khi chưa có (process mới) mới hỏi importance.
+        UiPulse.fgPkg?.let { return it == Config.PKG }
+        return runCatching {
+            ctx.getSystemService(ActivityManager::class.java).runningAppProcesses
+                ?.firstOrNull { it.pid == android.os.Process.myPid() }
+                ?.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+        }.getOrDefault(false)
+    }
 
     private val handler by lazy { Handler(Looper.getMainLooper()) }
 
@@ -49,13 +59,10 @@ object KioskReturn {
     private fun attempt(ctx: Context, n: Int) {
         val phase = AgentState.phase
         if (phase == AgentState.Phase.ACQUIRING || phase == AgentState.Phase.STREAMING) return
-        if (n > 0) {
-            val fg = UiPulse.fgPkg
-            // Không có sự kiện a11y thì không kiểm chứng được: dừng, đừng bấm Home mù lên kiosk đang sáng.
-            if (fg == null || !needsReturn(fg)) {
-                Log.i(Config.TAG, "kiosk return settled fg=$fg")
-                return
-            }
+        // Process mới chưa có sự kiện a11y nên fgPkg hay null: hỏi hệ thống xem app mình có còn ở trên cùng không.
+        if (n > 0 && !coversScreen(ctx)) {
+            Log.i(Config.TAG, "kiosk return settled fg=${UiPulse.fgPkg}")
+            return
         }
         if (n >= MAX_TRIES) {
             Log.w(Config.TAG, "kiosk return gave up fg=${UiPulse.fgPkg}")

@@ -90,13 +90,13 @@ object HeadwindBridge : ServiceConnection {
             ManagedConfig.DEVICE_ID, "deviceId",
             ManagedConfig.RELAY_PORT, "ws_port",
             ManagedConfig.KIOSK_PKG, "kiosk_package", "kiosk",
+            ManagedConfig.DIM_AFTER_MIN, ManagedConfig.DIM_LEVEL,
         )) {
             val v = runCatching { remote.queryAppPreference(pkg, k) }.getOrNull()
             if (!v.isNullOrBlank()) raw[k] = v
         }
         // Chỉ log key kiosk (không phải bí mật): phân biệt "Headwind không trả gì" với "app không hỏi".
-        Log.i(Config.TAG, "hmdm pull pkg=$pkg kiosk=${listOf(ManagedConfig.KIOSK_PKG, "kiosk_package", "kiosk")
-            .joinToString { k -> "$k=" + (runCatching { remote.queryAppPreference(pkg, k) }.getOrNull() ?: "null") }}")
+        Log.i(Config.TAG, "hmdm pull pkg=$pkg kiosk=${raw[ManagedConfig.KIOSK_PKG] ?: raw["kiosk_package"] ?: raw["kiosk"]}")
         if (ManagedConfig.apply(ctx, raw)) MqttClient.connectNow()
     }
 }

@@ -36,12 +36,15 @@ object HwMonitor {
     private const val MAX_BYTES = 200_000L
     private const val REPORT_COOLDOWN_MS = 10 * 60_000L
     private const val LAG_PROBE_MS = 5_000L
+    const val MAX_DUMP = 100
 
     private var thread: HandlerThread? = null
     private var handler: Handler? = null
     private val recent = ArrayDeque<HwSample>()
     private val lastReport = HashMap<String, Long>()
+    private val unsent = HashSet<String>()
     private var prevCpu: LongArray? = null
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     @Volatile private var latest: HwSample? = null
 
@@ -92,7 +95,7 @@ object HwMonitor {
     fun dump(nonce: String?, n: Int) {
         val run = Runnable {
             val arr = JSONArray()
-            tail(n.coerceIn(1, 200)).forEach { l -> runCatching { arr.put(JSONObject(l)) } }
+            tail(n.coerceIn(1, MAX_DUMP)).forEach { l -> runCatching { arr.put(JSONObject(l)) } }
             MqttClient.publishHw(nonce, arr)
         }
         handler?.post(run) ?: run.run()
@@ -106,11 +109,20 @@ object HwMonitor {
         while (recent.size > HwAnomaly.BUSY_SAMPLES) recent.removeFirst()
         append(toJson(s, codes).toString(), sync = codes.isNotEmpty())
         val now = System.currentTimeMillis()
-        for (c in codes) {
-            if (!HwAnomaly.shouldReport(c, now, lastReport, REPORT_COOLDOWN_MS)) continue
-            lastReport[c] = now
-            Log.w(Config.TAG, "hw anomaly $c ${toJson(s, codes)}")
-            MqttClient.publishEvent("HW_$c", brief(s))
+        // Mã phát hiện theo cạnh (TOUCH_GONE, PANEL_OFF) sẽ không lặp lại ở mẫu sau, nên mã chưa gửi được
+        // (offline) phải nhớ riêng và gửi lại khi có mạng.
+        for (c in (codes + unsent).distinct()) {
+            if (!HwAnomaly.shouldReport(c, now, lastReport, REPORT_COOLDOWN_MS)) {
+                unsent.remove(c)
+                continue
+            }
+            if (c in codes) Log.w(Config.TAG, "hw anomaly $c ${toJson(s, codes)}")
+            if (MqttClient.publishEvent("HW_$c", brief(s))) {
+                lastReport[c] = now
+                unsent.remove(c)
+            } else {
+                unsent.add(c)
+            }
         }
     }
 
@@ -150,6 +162,7 @@ object HwMonitor {
             uiIdleMs = UiPulse.uiIdleMs(now),
             lockTask = runCatching { am.lockTaskModeState }.getOrDefault(-1),
             anrDialog = UiPulse.anrRecent(now),
+            dimmed = DimController.dimmed,
         )
     }
 
@@ -157,7 +170,7 @@ object HwMonitor {
     private fun mainLag(): Long {
         val t0 = System.nanoTime()
         val done = CountDownLatch(1)
-        Handler(Looper.getMainLooper()).post { done.countDown() }
+        mainHandler.post { done.countDown() }
         val ok = done.await(LAG_PROBE_MS, TimeUnit.MILLISECONDS)
         return if (ok) (System.nanoTime() - t0) / 1_000_000 else LAG_PROBE_MS
     }
@@ -244,6 +257,7 @@ object HwMonitor {
         .put("fgPkg", s.fgPkg ?: JSONObject.NULL)
         .put("uiIdleMs", s.uiIdleMs)
         .put("lockTask", s.lockTask)
+        .put("dimmed", s.dimmed)
         .put("anomaly", JSONArray(codes))
 
     private fun brief(s: HwSample): String =

@@ -253,24 +253,24 @@ object MqttClient : MqttCallback {
         publish("rc/probe/$id", body.toString(), retained = false, qos = 1)
     }
 
-    fun publishEvent(code: String, msg: String) {
-        val ctx = appCtx ?: return
+    fun publishEvent(code: String, msg: String): Boolean {
+        val ctx = appCtx ?: return false
         val id = deviceId(ctx)
         val body = JSONObject()
             .put("t", "event")
             .put("code", code)
             .put("msg", msg)
             .put("ts", System.currentTimeMillis())
-        publish("rc/event/$id", body.toString(), retained = false, qos = 1)
+        return publish("rc/event/$id", body.toString(), retained = false, qos = 1)
     }
 
-    private fun publish(topic: String, payload: String, retained: Boolean, qos: Int) {
-        val c = client ?: return
-        if (!c.isConnected) return
-        runCatching {
+    private fun publish(topic: String, payload: String, retained: Boolean, qos: Int): Boolean {
+        val c = client ?: return false
+        if (!c.isConnected) return false
+        return runCatching {
             c.publish(topic, payload.toByteArray(), qos, retained)
             Log.i(Config.TAG, "pub $topic q$qos n=${payload.length}")
-        }.onFailure { Log.w(Config.TAG, "pub $topic fail: ${it.message}") }
+        }.onFailure { Log.w(Config.TAG, "pub $topic fail: ${it.message}") }.isSuccess
     }
 }
 

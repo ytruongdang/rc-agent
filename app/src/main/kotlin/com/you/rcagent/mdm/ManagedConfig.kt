@@ -15,6 +15,8 @@ object ManagedConfig {
     const val DEVICE_ID = "device_id"
     const val RELAY_PORT = "relay_port"
     const val KIOSK_PKG = "kiosk_pkg"
+    const val DIM_AFTER_MIN = "dim_after_min"
+    const val DIM_LEVEL = "dim_level"
 
     @Volatile var lastApplied: String = ""
         private set
@@ -31,6 +33,8 @@ object ManagedConfig {
         take(DEVICE_ID, DEVICE_ID, "deviceId")
         take(RELAY_PORT, RELAY_PORT, "ws_port")
         take(KIOSK_PKG, KIOSK_PKG, "kiosk_package", "kiosk")
+        take(DIM_AFTER_MIN, DIM_AFTER_MIN)
+        take(DIM_LEVEL, DIM_LEVEL)
         return out
     }
 
@@ -60,7 +64,11 @@ object ManagedConfig {
         }
         entries[DEVICE_ID]?.let { if (BackendPrefs.saveDeviceId(ctx, it) != null) changed = true }
         entries[RELAY_PORT]?.let { if (BackendPrefs.saveRelayPort(ctx, it) != null) changed = true }
-        entries[KIOSK_PKG]?.let { if (BackendPrefs.saveKioskPkg(ctx, it) != null) changed = true }
+        // Không đụng `changed`: kiosk_pkg không liên quan broker, đừng ép MQTT reconnect.
+        entries[KIOSK_PKG]?.let { BackendPrefs.saveKioskPkg(ctx, it) }
+        // Không đụng `changed`: làm mờ không liên quan broker.
+        entries[DIM_AFTER_MIN]?.let { BackendPrefs.saveDimAfterMin(ctx, it) }
+        entries[DIM_LEVEL]?.let { BackendPrefs.saveDimLevel(ctx, it) }
         lastApplied = entries.keys.joinToString(",")
         Log.i(Config.TAG, "mdm apply $lastApplied")
         return changed

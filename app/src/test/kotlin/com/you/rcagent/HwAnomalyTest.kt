@@ -32,7 +32,7 @@ class HwAnomalyTest {
         val gone = ok().copy(touchDevs = 0)
         assertTrue("TOUCH_GONE" in HwAnomaly.classify(gone, listOf(ok())))
         assertFalse("TOUCH_GONE" in HwAnomaly.classify(gone, listOf(gone)))
-        assertFalse("TOUCH_GONE" in HwAnomaly.classify(gone, emptyList()))
+        assertTrue("TOUCH_GONE" in HwAnomaly.classify(gone, emptyList()))
     }
 
     @Test
@@ -65,6 +65,8 @@ class HwAnomalyTest {
         assertTrue(com.you.rcagent.core.UiPulse.isAnrText("Kiosk isn't responding"))
         assertTrue(com.you.rcagent.core.UiPulse.isAnrText("Ứng dụng không phản hồi"))
         assertFalse(com.you.rcagent.core.UiPulse.isAnrText("Start now"))
+        assertFalse(com.you.rcagent.core.UiPulse.isAnrText("Recording has stopped"))
+        assertTrue(com.you.rcagent.core.UiPulse.isAnrText("Kiosk has stopped", broad = true))
         assertTrue(com.you.rcagent.core.UiPulse.isSystemPkg("android"))
         assertFalse(com.you.rcagent.core.UiPulse.isSystemPkg("com.kiosk.app"))
     }

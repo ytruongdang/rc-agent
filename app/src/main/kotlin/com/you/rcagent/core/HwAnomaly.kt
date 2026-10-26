@@ -26,6 +26,7 @@ data class HwSample(
     val uiIdleMs: Long = -1,
     val lockTask: Int = -1,
     val anrDialog: Boolean = false,
+    val dimmed: Boolean = false,
 )
 
 /**
@@ -58,8 +59,11 @@ object HwAnomaly {
         // Máy tưởng màn hình đang sáng nhưng panel không ở STATE_ON: đúng triệu chứng "đen mà remote vẫn thấy".
         // Phải tắt ở 2 mẫu liên tiếp: chuyển trạng thái/AOD thoáng qua không phải panel chết.
         if (panelDark(cur) && recent.lastOrNull()?.let { panelDark(it) } == true) out += "PANEL_OFF"
+        // Chưa có mẫu trước (process mới) coi như chưa biết → báo: đúng ca cảm ứng chết trước khi agent khởi động lại.
         // Input device cảm ứng biến mất: remote vẫn bấm được vì Knox/gesture không đi qua driver cảm ứng.
-        if (cur.touchDevs == 0 && (recent.lastOrNull()?.touchDevs ?: 0) > 0) out += "TOUCH_GONE"
+        val prevTouch = recent.lastOrNull()?.touchDevs
+        // -1 là đọc lỗi (chưa biết), không phải "mất cảm ứng".
+        if (cur.touchDevs == 0 && (prevTouch == null || prevTouch > 0)) out += "TOUCH_GONE"
         if (cur.mainLagMs >= MAIN_LAG_MS) out += "MAIN_LAG"
         if (sustained(cur, recent) { it.gpuPct }) out += "GPU_PEGGED"
         if (sustained(cur, recent) { it.cpuPct }) out += "CPU_PEGGED"

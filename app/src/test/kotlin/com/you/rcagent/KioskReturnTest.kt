@@ -24,9 +24,7 @@ class KioskReturnTest {
     }
 
     @Test
-    fun returnsOnlyWhenWeCoverTheScreen() {
-        assertTrue(KioskReturn.needsReturn(null))
-        assertTrue(KioskReturn.needsReturn("com.you.rcagent"))
-        assertFalse(KioskReturn.needsReturn("a.kiosk"))
+    fun settingsIsNeverAKioskTarget() {
+        assertFalse(KioskReturn.isCandidate("com.android.settings"))
     }
 }

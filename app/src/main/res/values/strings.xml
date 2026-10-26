@@ -16,6 +16,10 @@
     <string name="mdm_device_id_desc" formatted="false">MQTT username. Đặt %SERIAL% để dùng serial máy</string>
     <string name="mdm_kiosk_pkg">Kiosk browser package</string>
     <string name="mdm_kiosk_pkg_desc">Package của app kiosk để tự quay về sau khi rc-agent được cập nhật. Trống = dùng app kiosk đã thấy gần nhất</string>
+    <string name="mdm_dim_after">Làm mờ sau (phút)</string>
+    <string name="mdm_dim_after_desc">Số phút không chạm màn hình thì làm mờ. Để tắt: đặt off (trống/0 = giữ giá trị đã nhận)</string>
+    <string name="mdm_dim_level">Độ sáng khi mờ (%)</string>
+    <string name="mdm_dim_level_desc">5–80, mặc định 30</string>
     <string name="mdm_relay_port">Relay WebSocket port</string>
     <string name="mdm_relay_port_desc">Trống hoặc 0 = mặc định (443 wss / 3001 ws)</string>
     <string name="connection_title">Cài đặt kết nối</string>

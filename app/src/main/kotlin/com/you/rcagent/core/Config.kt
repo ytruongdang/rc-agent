@@ -83,6 +83,8 @@ object BackendPrefs {
     private const val KEY_RELAY_PORT = "relay_port"
     private const val KEY_KIOSK_PKG = "kiosk_pkg"
     private const val KEY_KIOSK_SEEN = "kiosk_pkg_seen"
+    private const val KEY_DIM_AFTER = "dim_after_min"
+    private const val KEY_DIM_LEVEL = "dim_level"
 
     fun parseHost(raw: String): String? {
         val rest = raw.trim().substringAfter("://", raw.trim()).substringBefore("/").substringBefore("?")
@@ -146,6 +148,22 @@ object BackendPrefs {
     fun saveSeenKioskPkg(ctx: Context, pkg: String) {
         val sp = ctx.getSharedPreferences(PREFS, 0)
         if (sp.getString(KEY_KIOSK_SEEN, null) != pkg) sp.edit().putString(KEY_KIOSK_SEEN, pkg).apply()
+    }
+
+    /** 0 = tắt (mặc định): máy chưa được MDM bật thì không đổi hành vi. */
+    fun dimAfterMin(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt(KEY_DIM_AFTER, 0)
+
+    fun dimLevel(ctx: Context): Int =
+        ctx.getSharedPreferences(PREFS, 0).getInt(KEY_DIM_LEVEL, DimPolicy.DEFAULT_LEVEL)
+
+    fun saveDimAfterMin(ctx: Context, raw: String) {
+        DimPolicy.parseAfterMin(raw)?.let { ctx.getSharedPreferences(PREFS, 0).edit().putInt(KEY_DIM_AFTER, it).apply() }
+    }
+
+    fun saveDimLevel(ctx: Context, raw: String) {
+        raw.trim().toIntOrNull()?.let {
+            ctx.getSharedPreferences(PREFS, 0).edit().putInt(KEY_DIM_LEVEL, DimPolicy.clampLevel(it)).apply()
+        }
     }
 
     fun clearDeviceId(ctx: Context) {

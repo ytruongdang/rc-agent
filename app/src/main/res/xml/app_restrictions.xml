@@ -35,4 +35,16 @@
         android:description="@string/mdm_kiosk_pkg_desc"
         android:restrictionType="string"
         android:defaultValue=""/>
+    <restriction
+        android:key="dim_after_min"
+        android:title="@string/mdm_dim_after"
+        android:description="@string/mdm_dim_after_desc"
+        android:restrictionType="string"
+        android:defaultValue=""/>
+    <restriction
+        android:key="dim_level"
+        android:title="@string/mdm_dim_level"
+        android:description="@string/mdm_dim_level_desc"
+        android:restrictionType="string"
+        android:defaultValue=""/>
 </restrictions>
