@@ -39,7 +39,6 @@ object HwAnomaly {
 
     const val THERMAL_SEVERE = 3
     const val BATT_HOT_C = 47f
-    const val ZONE_HOT_C = 85f
     const val LOW_MEM_PCT = 7
     const val LOW_DISK_MB = 300
     const val MAIN_LAG_MS = 1_500L
@@ -50,10 +49,8 @@ object HwAnomaly {
 
     fun classify(cur: HwSample, recent: List<HwSample>): List<String> {
         val out = ArrayList<String>()
-        if (cur.thermal >= THERMAL_SEVERE ||
-            (cur.battTempC ?: 0f) >= BATT_HOT_C ||
-            (cur.zoneMaxC ?: 0f) >= ZONE_HOT_C
-        ) out += "THERMAL"
+        // zoneMaxC chỉ để ghi log: trên S23 có zone đọc ~95°C khi pin 25°C và thermal status 0 (cảm biến không phải CPU).
+        if (cur.thermal >= THERMAL_SEVERE || (cur.battTempC ?: 0f) >= BATT_HOT_C) out += "THERMAL"
         if (cur.lowMem || (cur.memTotalMb > 0 && cur.memAvailMb * 100 / cur.memTotalMb < LOW_MEM_PCT)) {
             out += "LOW_MEM"
         }
