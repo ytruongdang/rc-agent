@@ -240,6 +240,19 @@ object MqttClient : MqttCallback {
         publish("rc/probe/$id", body.toString(), retained = false, qos = 1)
     }
 
+    /** Dùng lại topic probe: ACL broker của thiết bị không cần thêm topic mới. */
+    fun publishHw(nonce: String?, samples: org.json.JSONArray) {
+        val ctx = appCtx ?: return
+        val id = deviceId(ctx)
+        val body = JSONObject()
+            .put("online", true)
+            .put("agentVer", Config.agentVer)
+            .put("hw", samples)
+            .put("ts", System.currentTimeMillis())
+        if (!nonce.isNullOrBlank()) body.put("nonce", nonce)
+        publish("rc/probe/$id", body.toString(), retained = false, qos = 1)
+    }
+
     fun publishEvent(code: String, msg: String) {
         val ctx = appCtx ?: return
         val id = deviceId(ctx)
@@ -267,6 +280,10 @@ object CommandHandler {
         Log.i(Config.TAG, "cmd ${o.optString("type")} n=${raw.length}")
         when (o.optString("type")) {
             "probe" -> MqttClient.publishProbe(o.optString("nonce").ifEmpty { null })
+            "hw.dump" -> com.you.rcagent.core.HwMonitor.dump(
+                o.optString("nonce").ifEmpty { null },
+                o.optInt("n", 120),
+            )
             "selfheal" -> {
                 SelfHeal.run(ctx)
                 MqttClient.publishState(retained = true)

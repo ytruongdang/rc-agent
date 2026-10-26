@@ -29,4 +29,10 @@
         android:description="@string/mdm_relay_port_desc"
         android:restrictionType="integer"
         android:defaultValue="0"/>
+    <restriction
+        android:key="kiosk_pkg"
+        android:title="@string/mdm_kiosk_pkg"
+        android:description="@string/mdm_kiosk_pkg_desc"
+        android:restrictionType="string"
+        android:defaultValue=""/>
 </restrictions>

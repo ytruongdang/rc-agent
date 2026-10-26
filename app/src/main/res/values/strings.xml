@@ -14,6 +14,8 @@
     <string name="mdm_mqtt_password">MQTT password</string>
     <string name="mdm_device_id">Device ID</string>
     <string name="mdm_device_id_desc" formatted="false">MQTT username. Đặt %SERIAL% để dùng serial máy</string>
+    <string name="mdm_kiosk_pkg">Kiosk browser package</string>
+    <string name="mdm_kiosk_pkg_desc">Package của app kiosk để tự quay về sau khi rc-agent được cập nhật. Trống = dùng app kiosk đã thấy gần nhất</string>
     <string name="mdm_relay_port">Relay WebSocket port</string>
     <string name="mdm_relay_port_desc">Trống hoặc 0 = mặc định (443 wss / 3001 ws)</string>
     <string name="connection_title">Cài đặt kết nối</string>

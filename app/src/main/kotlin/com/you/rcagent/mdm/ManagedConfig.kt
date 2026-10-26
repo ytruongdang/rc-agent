@@ -14,6 +14,7 @@ object ManagedConfig {
     const val MQTT_PASSWORD = "mqtt_password"
     const val DEVICE_ID = "device_id"
     const val RELAY_PORT = "relay_port"
+    const val KIOSK_PKG = "kiosk_pkg"
 
     @Volatile var lastApplied: String = ""
         private set
@@ -29,6 +30,7 @@ object ManagedConfig {
         take(MQTT_PASSWORD, MQTT_PASSWORD, "mqtt_pass")
         take(DEVICE_ID, DEVICE_ID, "deviceId")
         take(RELAY_PORT, RELAY_PORT, "ws_port")
+        take(KIOSK_PKG, KIOSK_PKG, "kiosk_package", "kiosk")
         return out
     }
 
@@ -58,6 +60,7 @@ object ManagedConfig {
         }
         entries[DEVICE_ID]?.let { if (BackendPrefs.saveDeviceId(ctx, it) != null) changed = true }
         entries[RELAY_PORT]?.let { if (BackendPrefs.saveRelayPort(ctx, it) != null) changed = true }
+        entries[KIOSK_PKG]?.let { if (BackendPrefs.saveKioskPkg(ctx, it) != null) changed = true }
         lastApplied = entries.keys.joinToString(",")
         Log.i(Config.TAG, "mdm apply $lastApplied")
         return changed

@@ -22,5 +22,6 @@ class BootReceiver : BroadcastReceiver() {
         Log.i(Config.TAG, "caps ${Capabilities.probe(ctx)}")
         AgentState.set(AgentState.Phase.IDLE)
         MqttClient.connectNow()
+        if (intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) KioskReturn.afterUpdate(ctx)
     }
 }
