@@ -32,6 +32,21 @@ class DimPolicyTest {
     }
 
     @Test
+    fun alphaNeverExceedsDeviceTouchThreshold() {
+        assertEquals(0.5f, DimPolicy.alphaFor(5, maxOpacity = 0.5f), 0.001f)
+        assertEquals(0.2f, DimPolicy.alphaFor(80, maxOpacity = 0.5f), 0.001f)
+        assertEquals(0.8f, DimPolicy.alphaFor(5, maxOpacity = 1f), 0.001f)
+        assertEquals(0f, DimPolicy.alphaFor(30, maxOpacity = 0f), 0.001f)
+    }
+
+    @Test
+    fun neverDimsWhileOffline() {
+        val min = 60_000L
+        assertTrue(DimPolicy.shouldDim(9 * min, 5 * min, false, true, true, online = true))
+        assertFalse(DimPolicy.shouldDim(9 * min, 5 * min, false, true, true, online = false))
+    }
+
+    @Test
     fun dimsOnlyWhenIdleAndAllowed() {
         val min = 60_000L
         assertTrue(DimPolicy.shouldDim(5 * min, 5 * min, false, true, true))
