@@ -155,14 +155,19 @@ object DimController {
         val level = DimPolicy.clampLevel(BackendPrefs.dimLevel(ctx))
         // Samsung bỏ qua screenBrightness của cửa sổ overlay (đã thử trên SM-S918B: mBrightness không đổi),
         // nên dùng lớp đen bán trong suốt: giảm công suất trên OLED, không giảm đèn nền trên LCD.
-        val v = View(ctx).apply { setBackgroundColor(Color.argb((DimPolicy.alphaFor(level) * 255).toInt(), 0, 0, 0)) }
+        val v = View(ctx).apply { setBackgroundColor(Color.BLACK) }
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             TYPE_APPLICATION_OVERLAY,
             FLAG_NOT_FOCUSABLE or FLAG_NOT_TOUCHABLE or FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
-        )
+        ).apply {
+            // Android 12+ tính độ đục chặn chạm theo alpha của CỬA SỔ, không theo màu pixel: nền bán trong suốt
+            // với alpha cửa sổ mặc định 1.0 bị coi là đục hẳn, mọi cú chạm bị bỏ và watcher cũng không thấy
+            // ACTION_OUTSIDE nên không bao giờ gỡ mờ. Độ mờ phải nằm ở lp.alpha (≤ 0.8), nền đen đặc.
+            alpha = DimPolicy.alphaFor(level)
+        }
         if (runCatching { wm?.addView(v, lp) }.isSuccess) {
             dimView = v
             dimmed = true

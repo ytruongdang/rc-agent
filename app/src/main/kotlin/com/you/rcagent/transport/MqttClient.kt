@@ -64,6 +64,11 @@ object MqttClient : MqttCallback {
         }
     }
 
+    // Executor dùng chung: Paho không tự tắt executor truyền vào, mỗi lần connect() tạo mới sẽ rò thread.
+    private val pahoExecutor: java.util.concurrent.ScheduledExecutorService by lazy {
+        java.util.concurrent.Executors.newScheduledThreadPool(4) { r -> Thread(r, "rc-mqtt").apply { isDaemon = true } }
+    }
+
     @Volatile var lastError: String? = null
         private set
 
@@ -138,7 +143,7 @@ object MqttClient : MqttCallback {
                     },
             )
         }
-        val c = MqttAsyncClient(broker, id, MemoryPersistence())
+        val c = MqttAsyncClient(broker, id, MemoryPersistence(), AlarmPingSender(ctx), pahoExecutor)
         c.setCallback(this)
         client = c
         Log.i(Config.TAG, "mqtt connect $id -> $broker")
@@ -257,7 +262,9 @@ object MqttClient : MqttCallback {
         val ctx = appCtx ?: return
         val caps = Capabilities.probe(ctx)
         val fp = CapsSync.fingerprint(caps, Config.agentVer)
-        if (fp != lastCapsFp) {
+        // Will (online:false, retained) của kết nối cũ có thể đến broker SAU khi mình đã nối lại / chưa biết bị cắt:
+        // máy tưởng đang online còn backend thấy offline. Heartbeat ghi lại full retained để tự lành, trừ lúc a11y còn đang bind.
+        if (fp != lastCapsFp || !CapsSync.waitForA11y(Capabilities.a11yListed(ctx), Capabilities.a11yBound(), settleTries)) {
             publishState(retained = true)
             return
         }
