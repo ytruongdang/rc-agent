@@ -3,12 +3,15 @@ package com.you.rcagent.transport
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.you.rcagent.RcApplication
 import com.you.rcagent.boot.SelfHeal
 import com.you.rcagent.core.AgentState
 import com.you.rcagent.core.Capabilities
 import com.you.rcagent.core.CapsSync
+import com.you.rcagent.core.ConnLog
+import com.you.rcagent.core.ConnPolicy
 import com.you.rcagent.core.BackendPrefs
 import com.you.rcagent.core.capsJson
 import com.you.rcagent.core.Config
@@ -38,7 +41,11 @@ object MqttClient : MqttCallback {
     private var attempt = 0
     private var settleTries = 0
     private var replacing = false
+    private val COALESCE_MS = 3_000L
     private var lastCapsFp: String? = null
+    private var connectStartMs = 0L
+    private var connectedAtMs = 0L
+    private var pendingBy = "start"
     private val heartbeat = object : Runnable {
         override fun run() {
             publishHeartbeat()
@@ -57,6 +64,11 @@ object MqttClient : MqttCallback {
         }
     }
 
+    // Executor dùng chung: Paho không tự tắt executor truyền vào, mỗi lần connect() tạo mới sẽ rò thread.
+    private val pahoExecutor: java.util.concurrent.ScheduledExecutorService by lazy {
+        java.util.concurrent.Executors.newScheduledThreadPool(4) { r -> Thread(r, "rc-mqtt").apply { isDaemon = true } }
+    }
+
     @Volatile var lastError: String? = null
         private set
 
@@ -68,7 +80,19 @@ object MqttClient : MqttCallback {
         connect()
     }
 
-    fun connectNow() {
+    /**
+     * Ép nối lại. `force=false` (wake/boot) gộp vào lần nối vừa bắt đầu <3s trước: lúc khởi động start() + MDM +
+     * BootReceiver từng dựng/huỷ 3 kết nối cùng clientId trong 0,5s. `force=true` (đổi cấu hình, bấm tay) luôn nối lại.
+     */
+    fun connectNow(reason: String = "unspecified", force: Boolean = false) {
+        val since = SystemClock.elapsedRealtime() - connectStartMs
+        if (!force && connectStartMs != 0L && since < COALESCE_MS) {
+            ConnLog.add("coalesced", reason, mapOf("by" to reason))
+            Log.i(Config.TAG, "mqtt connectNow($reason) coalesced, connect started ${since}ms ago")
+            return
+        }
+        ConnLog.add("force", reason, mapOf("by" to reason))
+        pendingBy = reason
         handler.removeCallbacks(heartbeat)
         handler.removeCallbacks(settleState)
         attempt = 0
@@ -79,6 +103,9 @@ object MqttClient : MqttCallback {
         val ctx = appCtx ?: RcApplication.app
         val id = deviceId(ctx)
         val broker = Config.mqttBroker
+        connectStartMs = SystemClock.elapsedRealtime()
+        ConnLog.add("connect", null, mapOf("attempt" to attempt, "by" to pendingBy, "net" to netOf(ctx)))
+        pendingBy = "retry"
         if (!Config.permitsUri(broker)) {
             lastError = "cleartext mqtt blocked"
             Log.e(Config.TAG, lastError!!)
@@ -116,7 +143,7 @@ object MqttClient : MqttCallback {
                     },
             )
         }
-        val c = MqttAsyncClient(broker, id, MemoryPersistence())
+        val c = MqttAsyncClient(broker, id, MemoryPersistence(), AlarmPingSender(ctx), pahoExecutor)
         c.setCallback(this)
         client = c
         Log.i(Config.TAG, "mqtt connect $id -> $broker")
@@ -125,6 +152,9 @@ object MqttClient : MqttCallback {
                 override fun onSuccess(asyncActionToken: IMqttToken?) {
                     if (client !== c) return
                     replacing = false
+                    val tookMs = SystemClock.elapsedRealtime() - connectStartMs
+                    ConnLog.add("connect_ok", null, mapOf("attempt" to attempt, "delayMs" to tookMs))
+                    connectedAtMs = SystemClock.elapsedRealtime()
                     attempt = 0
                     connected = true
                     lastError = null
@@ -138,6 +168,8 @@ object MqttClient : MqttCallback {
                     handler.removeCallbacks(heartbeat)
                     handler.postDelayed(heartbeat, Config.HEARTBEAT_MS)
                     Log.i(Config.TAG, "mqtt connected")
+                    // Vừa nối lại mà gần đây đã rớt nhiều lần: báo lên kèm lý do để backend đối chiếu với phía broker.
+                    ConnLog.takeFlapSummary()?.let { publishEvent("MQTT_FLAP", it) }
                 }
 
                 override fun onFailure(asyncActionToken: IMqttToken?, exception: Throwable?) {
@@ -145,6 +177,7 @@ object MqttClient : MqttCallback {
                     replacing = false
                     connected = false
                     lastError = exception?.message ?: "mqtt fail"
+                    ConnLog.add("connect_fail", "${exception?.javaClass?.simpleName}: ${exception?.message}", mapOf("attempt" to attempt))
                     Log.w(Config.TAG, "mqtt fail: $lastError")
                     scheduleReconnect()
                 }
@@ -173,7 +206,23 @@ object MqttClient : MqttCallback {
         connected = false
         Log.w(Config.TAG, "mqtt disconnected ${disconnectResponse?.reasonString} rc=${disconnectResponse?.returnCode}")
         handler.removeCallbacks(heartbeat)
-        if (replacing) return
+        if (replacing) {
+            // Do chính mình thay kết nối (connect() đóng cái cũ), không phải mạng rớt.
+            ConnLog.add("replaced")
+            return
+        }
+        val ex = disconnectResponse?.exception
+        val reason = listOfNotNull(
+            disconnectResponse?.reasonString,
+            ConnPolicy.reasonName(disconnectResponse?.returnCode) ?: "rc=${disconnectResponse?.returnCode}",
+            ex?.let { "${it.javaClass.simpleName}: ${it.message}" },
+        ).joinToString(" ")
+        val ctx = appCtx
+        ConnLog.drop(
+            reason,
+            if (connectedAtMs == 0L) 0L else SystemClock.elapsedRealtime() - connectedAtMs,
+            if (ctx != null) mapOf("net" to netOf(ctx), "rssi" to rssiOf(ctx), "phase" to AgentState.phase.name) else emptyMap(),
+        )
         scheduleReconnect()
     }
 
@@ -213,7 +262,9 @@ object MqttClient : MqttCallback {
         val ctx = appCtx ?: return
         val caps = Capabilities.probe(ctx)
         val fp = CapsSync.fingerprint(caps, Config.agentVer)
-        if (fp != lastCapsFp) {
+        // Will (online:false, retained) của kết nối cũ có thể đến broker SAU khi mình đã nối lại / chưa biết bị cắt:
+        // máy tưởng đang online còn backend thấy offline. Heartbeat ghi lại full retained để tự lành, trừ lúc a11y còn đang bind.
+        if (fp != lastCapsFp || !CapsSync.waitForA11y(Capabilities.a11yListed(ctx), Capabilities.a11yBound(), settleTries)) {
             publishState(retained = true)
             return
         }
@@ -240,24 +291,41 @@ object MqttClient : MqttCallback {
         publish("rc/probe/$id", body.toString(), retained = false, qos = 1)
     }
 
-    fun publishEvent(code: String, msg: String) {
+    private fun netOf(ctx: Context): String = volatileOf(ctx)["net"]?.toString() ?: "unknown"
+    private fun rssiOf(ctx: Context): Int = (volatileOf(ctx)["rssi"] as? Int) ?: 0
+
+    /** Dùng lại topic probe: ACL broker của thiết bị không cần thêm topic mới. */
+    fun publishHw(nonce: String?, samples: org.json.JSONArray, conn: org.json.JSONArray? = null) {
         val ctx = appCtx ?: return
+        val id = deviceId(ctx)
+        val body = JSONObject()
+            .put("online", true)
+            .put("agentVer", Config.agentVer)
+            .put("hw", samples)
+            .put("ts", System.currentTimeMillis())
+        conn?.let { body.put("conn", it) }
+        if (!nonce.isNullOrBlank()) body.put("nonce", nonce)
+        publish("rc/probe/$id", body.toString(), retained = false, qos = 1)
+    }
+
+    fun publishEvent(code: String, msg: String): Boolean {
+        val ctx = appCtx ?: return false
         val id = deviceId(ctx)
         val body = JSONObject()
             .put("t", "event")
             .put("code", code)
             .put("msg", msg)
             .put("ts", System.currentTimeMillis())
-        publish("rc/event/$id", body.toString(), retained = false, qos = 1)
+        return publish("rc/event/$id", body.toString(), retained = false, qos = 1)
     }
 
-    private fun publish(topic: String, payload: String, retained: Boolean, qos: Int) {
-        val c = client ?: return
-        if (!c.isConnected) return
-        runCatching {
+    private fun publish(topic: String, payload: String, retained: Boolean, qos: Int): Boolean {
+        val c = client ?: return false
+        if (!c.isConnected) return false
+        return runCatching {
             c.publish(topic, payload.toByteArray(), qos, retained)
             Log.i(Config.TAG, "pub $topic q$qos n=${payload.length}")
-        }.onFailure { Log.w(Config.TAG, "pub $topic fail: ${it.message}") }
+        }.onFailure { Log.w(Config.TAG, "pub $topic fail: ${it.message}") }.isSuccess
     }
 }
 
@@ -267,6 +335,10 @@ object CommandHandler {
         Log.i(Config.TAG, "cmd ${o.optString("type")} n=${raw.length}")
         when (o.optString("type")) {
             "probe" -> MqttClient.publishProbe(o.optString("nonce").ifEmpty { null })
+            "hw.dump" -> com.you.rcagent.core.HwMonitor.dump(
+                o.optString("nonce").ifEmpty { null },
+                o.optInt("n", 120),
+            )
             "selfheal" -> {
                 SelfHeal.run(ctx)
                 MqttClient.publishState(retained = true)

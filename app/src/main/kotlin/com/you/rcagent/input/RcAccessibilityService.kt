@@ -26,6 +26,7 @@ class RcAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        runCatching { com.you.rcagent.core.UiPulse.onEvent(event) }
         AutoConsent.handle(this, event)
     }
 

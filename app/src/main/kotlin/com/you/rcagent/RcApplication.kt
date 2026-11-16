@@ -30,6 +30,8 @@ class RcApplication : Application() {
         com.you.rcagent.mdm.ManagedConfig.applyFromRestrictions(this)
         com.you.rcagent.mdm.HeadwindBridge.start(this)
         MqttClient.start(this)
+        com.you.rcagent.core.HwMonitor.start(this)
+        com.you.rcagent.core.DimController.start(this)
     }
 
     private fun dropStaleCrash() {

@@ -48,4 +48,10 @@ class ManagedConfigTest {
         )
         assertEquals("https://a.example", got[ManagedConfig.HOST])
     }
+
+    @Test
+    fun flattenMapsKioskPackageAliases() {
+        assertEquals("com.kiosk.browser", ManagedConfig.flatten(mapOf("kiosk_package" to "com.kiosk.browser"))[ManagedConfig.KIOSK_PKG])
+        assertEquals("com.kiosk.browser", ManagedConfig.flatten(mapOf("kiosk" to " com.kiosk.browser "))[ManagedConfig.KIOSK_PKG])
+    }
 }

@@ -80,7 +80,7 @@ class ConnectionActivity : Activity() {
         BackendPrefs.saveMqttPassword(this, mqttPassInput.text.toString())
         fill()
         Toast.makeText(this, mqtt, Toast.LENGTH_SHORT).show()
-        MqttClient.connectNow()
+        MqttClient.connectNow("ui-save", force = true)
     }
 
     private fun effective() = buildString {

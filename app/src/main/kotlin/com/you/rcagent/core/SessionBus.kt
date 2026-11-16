@@ -295,7 +295,7 @@ fun volatileOf(ctx: Context): Map<String, Any> {
         "batteryPct" to bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
         "net" to net,
         "rssi" to rssi(ctx, net),
-    )
+    ) + HwMonitor.summary()
 }
 
 private fun rssi(ctx: Context, net: String): Int {

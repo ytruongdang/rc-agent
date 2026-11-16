@@ -40,7 +40,7 @@ Bump `versionCode`/`versionName` together in [app/build.gradle.kts](app/build.gr
 - `rc/state/<id>` (retained, QoS 1) — caps + volatile telemetry; LWT publishes `online:false`
 - `rc/probe/<id>`, `rc/event/<id>` — one-shot answers and failure events
 
-Two subtleties worth preserving: retained state is delayed by `CapsSync.waitForA11y` so the backend never stores `a11y=false` during service bind, and heartbeats only re-publish full retained state when the caps fingerprint changes. `CommandHandler.rewriteLanHost` rewrites `localhost`/`127.0.0.1` in `wsUrl` to the configured host, because the backend publishes its own view of the relay URL.
+Two subtleties worth preserving: retained state is delayed by `CapsSync.waitForA11y` so the backend never stores `a11y=false` during service bind, and heartbeats re-publish the full retained state (except while a11y is still binding) so a late LWT `online:false` from a previous connection cannot leave the backend showing the device offline. `CommandHandler.rewriteLanHost` rewrites `localhost`/`127.0.0.1` in `wsUrl` to the configured host, because the backend publishes its own view of the relay URL.
 
 ### Data plane — WebSocket framing
 

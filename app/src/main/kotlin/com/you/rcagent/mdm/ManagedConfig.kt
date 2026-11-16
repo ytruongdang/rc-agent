@@ -14,6 +14,9 @@ object ManagedConfig {
     const val MQTT_PASSWORD = "mqtt_password"
     const val DEVICE_ID = "device_id"
     const val RELAY_PORT = "relay_port"
+    const val KIOSK_PKG = "kiosk_pkg"
+    const val DIM_AFTER_MIN = "dim_after_min"
+    const val DIM_LEVEL = "dim_level"
 
     @Volatile var lastApplied: String = ""
         private set
@@ -29,6 +32,9 @@ object ManagedConfig {
         take(MQTT_PASSWORD, MQTT_PASSWORD, "mqtt_pass")
         take(DEVICE_ID, DEVICE_ID, "deviceId")
         take(RELAY_PORT, RELAY_PORT, "ws_port")
+        take(KIOSK_PKG, KIOSK_PKG, "kiosk_package", "kiosk")
+        take(DIM_AFTER_MIN, DIM_AFTER_MIN)
+        take(DIM_LEVEL, DIM_LEVEL)
         return out
     }
 
@@ -47,19 +53,30 @@ object ManagedConfig {
     }
 
     fun apply(ctx: Context, raw: Map<String, String>): Boolean {
+        // Chỉ bản debug: test với máy đang được MDM quản lý thì Headwind đẩy cấu hình production đè lên cấu hình local.
+        // `pin_config` ghi bằng `adb shell run-as`; bản release không bao giờ đọc cờ này.
+        if (com.you.rcagent.BuildConfig.DEBUG && ctx.getSharedPreferences("rc", 0).getBoolean("pin_config", false)) {
+            Log.i(Config.TAG, "mdm apply ignored (pin_config, debug build)")
+            return false
+        }
         val entries = flatten(raw)
         if (entries.isEmpty()) return false
-        var changed = false
-        entries[HOST]?.let { if (BackendPrefs.saveHost(ctx, it) != null) changed = true }
-        entries[MQTT]?.let { if (BackendPrefs.saveMqtt(ctx, it) != null) changed = true }
-        entries[MQTT_PASSWORD]?.let {
-            BackendPrefs.saveMqttPassword(ctx, it)
-            changed = true
-        }
-        entries[DEVICE_ID]?.let { if (BackendPrefs.saveDeviceId(ctx, it) != null) changed = true }
-        entries[RELAY_PORT]?.let { if (BackendPrefs.saveRelayPort(ctx, it) != null) changed = true }
+        // So giá trị kết nối trước/sau: Headwind đẩy lại cùng một cấu hình mỗi lần đồng bộ, và trước đây mỗi lần như
+        // vậy đều ép MQTT ngắt rồi nối lại dù không có gì đổi.
+        val before = BackendPrefs.connFingerprint(ctx)
+        entries[HOST]?.let { BackendPrefs.saveHost(ctx, it) }
+        entries[MQTT]?.let { BackendPrefs.saveMqtt(ctx, it) }
+        entries[MQTT_PASSWORD]?.let { BackendPrefs.saveMqttPassword(ctx, it) }
+        entries[DEVICE_ID]?.let { BackendPrefs.saveDeviceId(ctx, it) }
+        entries[RELAY_PORT]?.let { BackendPrefs.saveRelayPort(ctx, it) }
+        val changed = BackendPrefs.connFingerprint(ctx) != before
+        // Không đụng `changed`: kiosk_pkg không liên quan broker, đừng ép MQTT reconnect.
+        entries[KIOSK_PKG]?.let { BackendPrefs.saveKioskPkg(ctx, it) }
+        // Không đụng `changed`: làm mờ không liên quan broker.
+        entries[DIM_AFTER_MIN]?.let { BackendPrefs.saveDimAfterMin(ctx, it) }
+        entries[DIM_LEVEL]?.let { BackendPrefs.saveDimLevel(ctx, it) }
         lastApplied = entries.keys.joinToString(",")
-        Log.i(Config.TAG, "mdm apply $lastApplied")
+        Log.i(Config.TAG, "mdm apply $lastApplied changed=$changed")
         return changed
     }
 

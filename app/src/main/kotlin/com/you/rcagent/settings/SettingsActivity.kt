@@ -63,7 +63,7 @@ class SettingsActivity : Activity() {
                 MqttClient.publishState(retained = true)
                 dump()
             })
-            addView(btn("MQTT connect now") { MqttClient.connectNow(); dump() })
+            addView(btn("MQTT connect now") { MqttClient.connectNow("ui-button", force = true); dump() })
             addView(btn("Overlay permission") {
                 startActivity(
                     Intent(
@@ -128,7 +128,7 @@ class SettingsActivity : Activity() {
     private fun applyWake() {
         if (intent?.action != Config.WAKE_ACTION) return
         ScreenWake.acquire(this)
-        MqttClient.connectNow()
+        MqttClient.connectNow("wake-activity")
         dump()
     }
 

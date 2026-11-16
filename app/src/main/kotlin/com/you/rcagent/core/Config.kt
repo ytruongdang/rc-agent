@@ -11,6 +11,7 @@ object Config {
     const val SVC_SHORT = "$PKG/.input.RcAccessibilityService"
     const val WAKE_ACTION = "$PKG.WAKE"
     const val HEARTBEAT_MS = 120_000L
+    const val HW_SAMPLE_MS = 30_000L
     const val MQTT_KEEPALIVE_S = 60
     const val KEYFRAME_WATCHDOG_MS = 2_500L
     const val KEYFRAME_DEADLINE_MS = 500L
@@ -80,6 +81,10 @@ object BackendPrefs {
     private const val KEY_MQTT_PASS = "mqtt_password"
     private const val KEY_DEVICE_ID = "device_id"
     private const val KEY_RELAY_PORT = "relay_port"
+    private const val KEY_KIOSK_PKG = "kiosk_pkg"
+    private const val KEY_KIOSK_SEEN = "kiosk_pkg_seen"
+    private const val KEY_DIM_AFTER = "dim_after_min"
+    private const val KEY_DIM_LEVEL = "dim_level"
 
     fun parseHost(raw: String): String? {
         val rest = raw.trim().substringAfter("://", raw.trim()).substringBefore("/").substringBefore("?")
@@ -124,6 +129,48 @@ object BackendPrefs {
         if (id.isEmpty()) return null
         ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_DEVICE_ID, id).apply()
         return id
+    }
+
+    fun kioskPkg(ctx: Context): String? =
+        ctx.getSharedPreferences(PREFS, 0).getString(KEY_KIOSK_PKG, null)?.takeIf { it.isNotBlank() }
+
+    fun saveKioskPkg(ctx: Context, raw: String): String? {
+        val p = raw.trim()
+        if (p.isEmpty() || p.any { it.isWhitespace() }) return null
+        ctx.getSharedPreferences(PREFS, 0).edit().putString(KEY_KIOSK_PKG, p).apply()
+        return p
+    }
+
+    /** App foreground gần nhất không phải rc-agent/installer: đích dự phòng khi MDM chưa chỉ định. */
+    fun seenKioskPkg(ctx: Context): String? =
+        ctx.getSharedPreferences(PREFS, 0).getString(KEY_KIOSK_SEEN, null)?.takeIf { it.isNotBlank() }
+
+    fun saveSeenKioskPkg(ctx: Context, pkg: String) {
+        val sp = ctx.getSharedPreferences(PREFS, 0)
+        if (sp.getString(KEY_KIOSK_SEEN, null) != pkg) sp.edit().putString(KEY_KIOSK_SEEN, pkg).apply()
+    }
+
+    /** 0 = tắt (mặc định): máy chưa được MDM bật thì không đổi hành vi. */
+    fun dimAfterMin(ctx: Context): Int = ctx.getSharedPreferences(PREFS, 0).getInt(KEY_DIM_AFTER, 0)
+
+    fun dimLevel(ctx: Context): Int =
+        ctx.getSharedPreferences(PREFS, 0).getInt(KEY_DIM_LEVEL, DimPolicy.DEFAULT_LEVEL)
+
+    fun saveDimAfterMin(ctx: Context, raw: String) {
+        DimPolicy.parseAfterMin(raw)?.let { ctx.getSharedPreferences(PREFS, 0).edit().putInt(KEY_DIM_AFTER, it).apply() }
+    }
+
+    fun saveDimLevel(ctx: Context, raw: String) {
+        raw.trim().toIntOrNull()?.let {
+            ctx.getSharedPreferences(PREFS, 0).edit().putInt(KEY_DIM_LEVEL, DimPolicy.clampLevel(it)).apply()
+        }
+    }
+
+    /** Chỉ các khoá ảnh hưởng tới kết nối broker/relay: so trước và sau khi áp cấu hình MDM. */
+    fun connFingerprint(ctx: Context): String {
+        val all = ctx.getSharedPreferences(PREFS, 0).all
+        return listOf(KEY_HOST, KEY_MQTT, KEY_TLS, KEY_MQTT_PASS, KEY_DEVICE_ID, KEY_RELAY_PORT)
+            .joinToString("|") { all[it]?.toString().orEmpty() }
     }
 
     fun clearDeviceId(ctx: Context) {

@@ -10,7 +10,7 @@ class ManagedConfigReceiver : BroadcastReceiver() {
         val a = intent?.action ?: return
         if (a == Intent.ACTION_APPLICATION_RESTRICTIONS_CHANGED) {
             if (ManagedConfig.applyFromRestrictions(ctx.applicationContext)) {
-                MqttClient.connectNow()
+                MqttClient.connectNow("restrictions", force = true)
             }
         } else if (a == "com.hmdm.push.configUpdated") {
             HeadwindBridge.pull()

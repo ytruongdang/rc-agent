@@ -9,6 +9,6 @@ import com.you.rcagent.core.Config
 class WakeReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, i: Intent) {
         ScreenWake.acquire(ctx, Config.WAKE_PUSH_MS)
-        MqttClient.connectNow()
+        MqttClient.connectNow("wake")
     }
 }

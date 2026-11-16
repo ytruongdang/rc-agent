@@ -33,8 +33,8 @@ android {
         applicationId = "com.you.rcagent"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10406
-        versionName = "1.4.6"
+        versionCode = 10410
+        versionName = "1.4.10"
         ndk { abiFilters += listOf("arm64-v8a") }
         // Endpoint mặc định đến từ gradle property, không hardcode hạ tầng vào source.
         // Fleet riêng: đặt trong local gradle.properties / -P / CI secret (xem README).
